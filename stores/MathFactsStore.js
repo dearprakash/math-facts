@@ -52,6 +52,8 @@ const makeUser = function(userId, userName) {
     id: userId,
     name: userName,
     deleted: false,
+    operation: 'multiplication',
+    time: 60,
   };
 };
 
@@ -107,13 +109,24 @@ const changeActiveUser = function(id) {
   updateUserData().then(fetchStoredData).done();
 };
 
+const setOperation = function(newOperation) {
+  _data['userList'][_data['activeUser']].operation = newOperation;
+  MathFactStore.emitChange();
+  updateUserData().done();
+};
+
+const setTime = function(newTime) {
+  _data['userList'][_data['activeUser']].time = newTime;
+  MathFactStore.emitChange();
+  updateUserData().done();
+};
+
 const updateUserData = function() {
   return Promise.all([
     AsyncStorage.setItem('activeUser', _data['activeUser'].toString()),
     AsyncStorage.setItem('userList', JSON.stringify(_data['userList'])),
   ]);
 };
-
 
 /*
  * Points
@@ -236,7 +249,17 @@ const fetchUserData = function() {
       _data['activeUser'] = (user == null) ? _data['activeUser'] : user;
     }),
     AsyncStorage.getItem('userList').then((userList) => {
-      _data['userList'] = (userList == null) ? _data['userList'] : JSON.parse(userList);
+      let ret = _data['userList'];
+      if (userList != null) {
+        ret = JSON.parse(userList).map((userData) => {
+          // Fill in default values and then overwrite with new ones
+          return {
+            ...makeDefaultUser(),
+            ...userData,
+          };
+        });
+      }
+      _data['userList'] = ret;
     }),
   ]);
 };
@@ -247,7 +270,16 @@ const fetchPoints = function() {
       _data['points'] = (points == null) ? 0 : parseInt(points);
     }),
     AsyncStorage.getItem(createKey('scores')).then((scores) => {
-      _data['scores'] = (scores == null) ? [] : JSON.parse(scores);
+      let ret = [];
+      if (scores != null) {
+        ret = JSON.parse(scores).map((scoreData) => {
+          if (typeof scoreData === 'number') {
+            return { score: scoreData, date: null };
+          }
+          return { score: scoreData.score, date: scoreData.date };
+        });
+      }
+      _data['scores'] = ret;
     }),
   ]);
 };
@@ -350,6 +382,16 @@ AppDispatcher.register(function(action) {
     case MathFactsConstants.USERS_CHANGE_ACTIVE_USER:
       const id = action.id;
       changeActiveUser(id);
+      break;
+
+    case MathFactsConstants.OPERATION_CHANGE:
+      const newOperation = action.operation;
+      setOperation(newOperation);
+      break;
+
+    case MathFactsConstants.TIME_CHANGE:
+      const newTime = action.time;
+      setTime(newTime);
       break;
 
     default:

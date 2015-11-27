@@ -11,7 +11,22 @@
 
 #import "RCTRootView.h"
 
+#import "CodePush.h"
+
+#import "RCTPushNotificationManager.h"
+
 @implementation AppDelegate
+
+// Required for the register event.
+- (void)application:(UIApplication *)application didRegisterForRemoteNotificationsWithDeviceToken:(NSData *)deviceToken
+{
+  [RCTPushNotificationManager application:application didRegisterForRemoteNotificationsWithDeviceToken:deviceToken];
+}
+// Required for the notification event.
+- (void)application:(UIApplication *)application didReceiveRemoteNotification:(NSDictionary *)notification
+{
+  [RCTPushNotificationManager application:application didReceiveRemoteNotification:notification];
+}
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
@@ -27,7 +42,7 @@
   // To run on device, change `localhost` to the IP address of your computer, and make sure your computer and
   // iOS device are on the same Wi-Fi network.
   jsCodeLocation = [NSURL URLWithString:@"http://localhost:8081/index.ios.bundle"];
-  // jsCodeLocation = [NSURL URLWithString:@"http://192.168.1.37:8081/index.ios.bundle"];
+  // jsCodeLocation = [NSURL URLWithString:@"http://192.168.1.3:8081/index.ios.bundle"];
 
   // OPTION 2
   // Load from pre-bundled file on disk. To re-generate the static bundle, run
@@ -36,10 +51,11 @@
   //
   // and uncomment the next following line
 #ifndef DEBUG
-  jsCodeLocation = [[NSBundle mainBundle] URLForResource:@"main" withExtension:@"jsbundle"];
+  jsCodeLocation = [CodePush getBundleUrl];
 #endif
   RCTRootView *rootView = [[RCTRootView alloc] initWithBundleURL:jsCodeLocation
                                                       moduleName:@"MathFacts"
+                                               initialProperties:nil
                                                    launchOptions:launchOptions];
 
   self.window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];

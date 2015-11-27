@@ -47,11 +47,12 @@ const NumPad = React.createClass({
 
     buttons.push(
       <NumPadButton
-        onPress={this.props.clear}
-        content='CLEAR'
-        key='clear'
+        onPress={this.props.hint}
+        content='HELP'
+        key='help'
         control={true} />
     );
+
     buttons.push(
       <NumPadButton
         onPress={() => {this.props.addDigit(0)}}
@@ -59,16 +60,13 @@ const NumPad = React.createClass({
         key='0'/>
     );
 
-    // TODO: Implement hints for multiplication
-    if (this.props.operation === 'addition') {
-      buttons.push(
-        <NumPadButton onPress={this.props.hint} content='?' key='hint'/>
-      );
-    } else {
-      buttons.push(
-        <NumPadButton onPress={null} content=' ' key='blank'/>
-      );
-    }
+    buttons.push(
+      <NumPadButton
+        onPress={this.props.clear}
+        content='CLEAR'
+        key='clear'
+        control={true} />
+    );
 
     return (
       <Keyboard>

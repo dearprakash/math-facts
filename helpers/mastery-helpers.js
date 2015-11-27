@@ -3,6 +3,7 @@
 import _ from 'underscore';
 
 import ColorHelpers from '../helpers/color-helpers';
+import Helpers from '../helpers/helpers';
 import OperationHelpers from '../helpers/operation-helpers';
 
 // The time to recall a fact from memory should be less than 800ms
@@ -25,24 +26,36 @@ const masteryTextColors = {
   mastered: '#f7feff',
 };
 
-const masteryDescription = {
-  unknown: 'You haven\'t answered this fact yet.',
-  struggling: 'You\'re having trouble with this fact.',
-  introduced: 'You haven\'t answered this fact enough times.',
-  practiced: 'You have answered this fact quickly sometimes.',
-  mastered: 'You know this fact from memory.',
+const masteryTitle = {
+  unknown: 'Not Practiced',
+  struggling: 'Tricky',
+  introduced: 'Just Started',
+  practiced: 'Almost there',
+  mastered: 'Mastered',
 };
 
-const getLearnerTypingTimes = function(quizzesData, operation) {
+const masteryDescription = {
+  unknown: `You haven't answered this one yet!`,
+  struggling: `This fact isn't as fast as your other ones. You'll get there! Keep practicing!`,
+  introduced: `We need to practice this one a few more times!`,
+  practiced: `We need to get this one to be a little faster!`,
+  mastered: `You know this fact from memory! You did it!`,
+};
+
+const getLearnerTypingTimes = function(factData, operation) {
   const oneDigitTimes = [];
   const twoDigitTimes = [];
   let count = 0;
-  _.each(quizzesData, (rowData, row) => {
+  _.each(factData, (rowData, row) => {
     _.each(rowData, (data, col) => {
       const answer = OperationHelpers[operation].getAnswer([row, col]);
       const numberLength = answer.toString().length;
       _.each(data, (timeData) => {
         // TODO: check if the data is recent (throw out really old times)
+        if (timeData.hintUsed) {
+          // Don't include typing times when hints were used
+          return;
+        }
         if (numberLength === 1) {
           oneDigitTimes.push(timeData.time);
           count++;
@@ -91,12 +104,19 @@ const getTypingTime = function(number, learnerTypingTimes) {
   return typingTime;
 };
 
-const getTimeBonus = function(time, number, learnerTypingTimes) {
+const getGoalTime = function(number, learnerTypingTimes) {
+  return getTypingTime(number, learnerTypingTimes) + MEMORY_TIME;
+};
+
+const getTimeBonus = function(time, number, learnerTypingTimes, hintUsed) {
+  if (hintUsed) {
+    return 1;
+  }
   // For a given number estimate the time in ms it takes this learner to
   // type it.
-  const typingTime = getTypingTime(number, learnerTypingTimes);
-  return time < typingTime + MEMORY_TIME ? 20 :
-    time < typingTime + MEMORY_TIME * 2 ? 5 :
+  const goalTime = getGoalTime(number, learnerTypingTimes);
+  return time <= goalTime ? 20 :
+    time <= goalTime * 2 ? 5 :
     1;
 };
 
@@ -104,6 +124,14 @@ const getTimeBonus = function(time, number, learnerTypingTimes) {
  * Given data about a particular math fact, determine the fact's mastery level
  *
  */
+const isFluent = function(number, time, learnerTypingTimes) {
+  // TODO: Maybe add another level of "quick but not fluent"?
+  if (time <= getGoalTime(number, learnerTypingTimes)) {
+    return true;
+  } else {
+    return false;
+  }
+};
 const getFactStatus = function(number, times, learnerTypingTimes) {
   // times is an array of the learner's time data for this fact in the form:
   // [ {time: 1200, date: 19346832, hintUsed: true},
@@ -146,20 +174,26 @@ const getFactStatus = function(number, times, learnerTypingTimes) {
     return 'unknown';
   }
 
-  let fluent = 0;
-  let nonFluent = 0;
+  let fluentTimes = 0;
+  let nonFluentTimes = 0;
 
-  _.each(times, (timeData) => {
+  // Only use the 10 most recent times
+  const recentTimes = times.slice(-10);
+  _.each(recentTimes, (timeData) => {
+    if (timeData.hintUsed) {
+      return;
+    }
     const time = timeData.time;
     // TODO: Only take into account the most recent times, but specifically
     // take into account times over the past few days to check for long-term
     // retention.
 
     // TODO: Maybe add another level of "quick but not fluent"?
-    if (time < getTypingTime(number, learnerTypingTimes) + MEMORY_TIME) {
-      fluent++;
+    const fluent = isFluent(number, time, learnerTypingTimes);
+    if (fluent) {
+      fluentTimes++;
     } else {
-      nonFluent++;
+      nonFluentTimes++;
     }
   });
 
@@ -169,15 +203,15 @@ const getFactStatus = function(number, times, learnerTypingTimes) {
 
   // If the learner has shown fluency on this fact more than 75% of the time,
   // we can consider them fluent.
-  if (fluent > nonFluent * 3) {
-    // fluent
+  if (fluentTimes >= nonFluentTimes * 2) {
+    // fluent overall
     return 'mastered';
   }
 
 
   // If they have more nonFluent than fluent facts, or have tried this fact
   // a bunch of times and aren't at mastery yet, assume they need some help.
-  if (fluent <= nonFluent || nonFluent > 4) {
+  if (fluentTimes <= nonFluentTimes || nonFluentTimes > 4) {
     // non-fluent
     return 'struggling';
   }
@@ -187,13 +221,124 @@ const getFactStatus = function(number, times, learnerTypingTimes) {
 
 };
 
+const addToInputList = function(operation, factData, inputList, propsTimeData, studyFact, spacer) {
+  const OperationHelper = OperationHelpers[operation];
+
+  const easiestFacts = OperationHelper.getEasiestFactOrder();
+  const max = 10;
+
+  const questionSeeds = [];
+
+  const learnerTypingTimes = getLearnerTypingTimes(
+    propsTimeData,
+    operation
+  );
+
+  // Populate question seeder with data about facts that have already been
+  // practiced
+  _.each(_.range(0, max + 1), (row) => {
+    questionSeeds[row] = [];
+    if (factData[row] == null) {
+      factData[row] = [];
+    }
+    _.each(_.range(0, max + 1), (col) => {
+      const timeData = factData[row][col];
+      const answer = OperationHelper.getAnswer([row, col]);
+      const factStatus = getFactStatus(answer, timeData,
+        learnerTypingTimes);
+      questionSeeds[row][col] = factStatus;
+    });
+  });
+
+  const fluentFacts = [];
+  const nonFluentFacts = [];
+  const unknownFacts = [];
+
+  const pushFact = function(fact) {
+    const left = fact[0];
+    const right = fact[1];
+    const fluency = questionSeeds[left][right];
+    if (fluency === 'mastered') {
+      fluentFacts.push(fact);
+    } else if (fluency === 'struggling') {
+      nonFluentFacts.push(fact);
+    } else {
+      unknownFacts.push(fact);
+    }
+  };
+
+  _.each(easiestFacts, (fact) => {
+    pushFact(fact);
+    if (fact[0] !== fact[1]) {
+      // Include the flipped fact if it's distinct (e.g. 2 + 1 and 1 + 2)
+      pushFact([fact[1], fact[0]]);
+    }
+  });
+
+  // TODO: update factData on the fly so we can have the most up-to-date
+  // view of which facts are fluent/not
+
+  // TODO: make sure there are enough facts for this quiz
+  if (unknownFacts.length > 0) {
+    // We don't have enough data about this user, so ask them unknown facts.
+    if (unknownFacts.length < 10) {
+      // If we have too few unknown facts, pad the questions with some facts
+      // that we know are fluent, making sure that everything is shuffled.
+      inputList = inputList.concat(Helpers.shuffle(
+        unknownFacts.concat(
+          Helpers.shuffle(fluentFacts).slice(0, 10 - unknownFacts.length)
+      )));
+    } else {
+      // If we're pullling from pretty much all the facts, give the easier
+      // facts first. The blockSize comes from figuring out approximately
+      // where the facts go from being easy to hard.
+      inputList = inputList.concat(Helpers.softShuffle(unknownFacts, 60));
+    }
+  } else if (nonFluentFacts.length > 0) {
+    // We know whether this learner is fluent or not fluent in each fact.
+    // We want to pick one struggling fact as the learning fact and use
+    // spaced repetition to introduce it into long term memory.
+
+    // TODO: Check something to do with long term memory?
+
+    if (studyFact.length === 0) {
+      // We get to choose the study fact! Pick the next easiest fact that we
+      // don't know.
+      studyFact = nonFluentFacts[0];
+    }
+
+    // We're introducing this fact via spaced repetition. This fact will be
+    // mixed in with fluent facts in the following pattern:
+    //    L F L F F L F F F L F F F F L F F F F F L F F F F F F L ...
+    // to attempt to work the fact into long-term memory.
+
+    inputList = inputList.concat([studyFact])
+      .concat(Helpers.shuffle(fluentFacts).slice(0, spacer));
+
+    spacer = spacer + 1;
+  } else {
+    // This learner is fluent in everything! Let them practice to their
+    // heart's content.
+    inputList = inputList.concat(Helpers.shuffle(fluentFacts));
+  }
+
+  return {
+    inputList: inputList,
+    spacer: spacer + 1,
+  };
+};
+
 
 module.exports = {
   masteryColors: masteryColors,
   masteryTextColors: masteryTextColors,
+  masteryTitle: masteryTitle,
   masteryDescription: masteryDescription,
 
+  getGoalTime: getGoalTime,
   getLearnerTypingTimes: getLearnerTypingTimes,
+  isFluent: isFluent,
   getFactStatus: getFactStatus,
   getTimeBonus: getTimeBonus,
+  addToInputList: addToInputList,
 };

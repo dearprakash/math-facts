@@ -13,8 +13,26 @@ import {
 import { AppText, AppTextBold, AppTextThin } from './AppText';
 
 import Button from '../components/Button';
+import CheckButton from '../components/CheckButton';
 import BackButton from '../components/BackButton';
 import RowButton from '../components/RowButton';
+
+const SettingsWrapper = React.createClass({
+  propTypes: {
+    goBack: React.PropTypes.func.isRequired,
+    style: React.PropTypes.object,
+  },
+  render: function() {
+    return (
+      <View style={[this.props.style, styles.settingsWrapper]}>
+        <View style={styles.topRow}>
+          <BackButton onPress={this.props.goBack} />
+        </View>
+        {this.props.children}
+      </View>
+    );
+  },
+});
 
 const ModeSelection = React.createClass({
   propTypes: {
@@ -26,7 +44,6 @@ const ModeSelection = React.createClass({
   setOperation: function(operation) {
     return () => {
       this.props.setOperation(operation);
-      this.props.goBack();
     };
   },
   render: function () {
@@ -36,29 +53,61 @@ const ModeSelection = React.createClass({
     } = this.props;
 
     return (
-      <View>
-        {/* TODO(clean code): Abstract the back button into a settings
-          * wrapper so there's less duplication. */}
-        <View style={styles.topRow}>
-          <BackButton onPress={goBack} />
-        </View>
-
+      <SettingsWrapper goBack={goBack}>
         <AppText style={styles.headingText}>
           What do you want to practice?
         </AppText>
-        <View style={styles.toggleButtons}>
-          <Button
-            text='Addition'
-            color={operation === 'addition' ? undefined : '#ddd'}
-            wrapperStyle={[styles.toggleButtonWrapper]}
-            onPress={this.setOperation('addition')} />
-          <Button
-            text='Multiplication'
-            color={operation === 'multiplication' ? undefined : '#ddd'}
-            wrapperStyle={[styles.toggleButtonWrapper]}
-            onPress={this.setOperation('multiplication')} />
-        </View>
-      </View>
+        <CheckButton
+          active={operation === 'addition'}
+          onPress={this.setOperation('addition')}
+          text='Addition' />
+        <CheckButton
+          active={operation === 'multiplication'}
+          last={true}
+          onPress={this.setOperation('multiplication')}
+          text='Multiplication' />
+      </SettingsWrapper>
+    );
+  },
+});
+
+
+const TimeSelection = React.createClass({
+  propTypes: {
+    goBack: React.PropTypes.func.isRequired,
+    time: React.PropTypes.string.isRequired,
+    setTime: React.PropTypes.func.isRequired,
+  },
+
+  setTime: function(time) {
+    return () => {
+      this.props.setTime(time);
+    };
+  },
+  render: function () {
+    const {
+      goBack,
+      time,
+    } = this.props;
+
+    const timeOptions = [20, 30, 60, 90, 120];
+    let idx = 0;
+
+    return (
+      <SettingsWrapper goBack={goBack}>
+        <AppText style={styles.headingText}>
+          How long do you want each game to be?
+        </AppText>
+        {timeOptions.map((value) => {
+          idx++;
+          return <CheckButton
+            key={idx}
+            text={`${value} seconds`}
+            active={time === value}
+            last={idx === timeOptions.length}
+            onPress={this.setTime(value)} />;
+        })}
+      </SettingsWrapper>
     );
   },
 });
@@ -84,11 +133,7 @@ const AddNewUser = React.createClass({
     } = this.props;
 
     return (
-      <View>
-        <View style={styles.topRow}>
-          <BackButton onPress={goBack} />
-        </View>
-
+      <SettingsWrapper goBack={goBack}>
         <AppText style={styles.headingText}>Hi! What's your name?</AppText>
         <TextInput
           autoCapitalize='words'
@@ -104,10 +149,11 @@ const AddNewUser = React.createClass({
           onSubmitEditing={this.handleSubmitEditing}
         />
         <Button
+          style={styles.submitButton}
           text="Add this player!"
           onPress={this.handleSubmitEditing}
         />
-      </View>
+      </SettingsWrapper>
     );
   },
 });
@@ -139,12 +185,10 @@ const ChangeUserName = React.createClass({
     } = this.props;
 
     return (
-      <View>
-        <View style={styles.topRow}>
-          <BackButton onPress={goBack} />
-        </View>
-
-        <AppText style={styles.headingText}>What's your new name?</AppText>
+      <SettingsWrapper goBack={goBack}>
+        <AppText style={styles.headingText}>
+          What's your new name?
+        </AppText>
         <TextInput
           autoCapitalize='words'
           autoFocus={true}
@@ -160,10 +204,11 @@ const ChangeUserName = React.createClass({
           onSubmitEditing={this.handleSubmitEditing}
         />
         <Button
+          style={styles.submitButton}
           text="Change my nickname!"
           onPress={this.handleSubmitEditing}
         />
-      </View>
+      </SettingsWrapper>
     );
   },
 });
@@ -187,36 +232,31 @@ const UserSelection = React.createClass({
     } = this.props;
 
     return (
-      <View style={styles.scrollViewContainer}>
-        <View style={styles.topRow}>
-          <BackButton onPress={goBack} />
-        </View>
-
-        <AppText style={styles.headingText}>Who are you?</AppText>
+      <SettingsWrapper goBack={goBack}>
+        <AppText style={styles.headingText}>
+          Who are you?
+        </AppText>
 
         <RowButton
           onPress={showAddNewUser}
-          text={'I\'m a new player!'} />
+          text={`I'm a new player!`} />
 
         <ScrollView>
-          {_.map(userList, (curUser) => {
+          {_.map(userList, (curUser, idx) => {
             return (
-              <Button
+              <CheckButton
+                active={curUser.id === user.id}
                 key={curUser.id}
-                text={curUser.name}
-                style={[
-                  styles.userListButton,
-                  (curUser.id === user.id) && styles.activeUserListButton
-                ]}
+                last={idx === userList.length - 1}
                 onPress={() => {
                   changeActiveUser(curUser.id);
-                  goBack();
-                }}/>
-            )
+                }}
+                text={curUser.name}
+              />
+            );
           })}
         </ScrollView>
-
-      </View>
+      </SettingsWrapper>
     );
   },
 });
@@ -238,20 +278,18 @@ const SettingsHome = React.createClass({
       operation,
       showChangeUserName,
       showModeSelection,
+      showTimeSelection,
       showUserSelection,
+      time,
       user,
       uuid,
     } = this.props;
 
     const printOperation = operation.slice(0, 1).toUpperCase() +
       operation.slice(1);
+
     return (
-      <View>
-
-        <View style={styles.topRow}>
-          <BackButton onPress={goBack} />
-        </View>
-
+      <SettingsWrapper goBack={goBack}>
         <AppText style={styles.headingText}>
           {'Hi '}
           <AppTextBold style={styles.headingTextEmphasis}>
@@ -272,6 +310,9 @@ const SettingsHome = React.createClass({
           onPress={showModeSelection}
           text={`Change Mode (${printOperation})`} />
 
+        <RowButton
+          onPress={showTimeSelection}
+          text={`Change Game Time (${time}s)`} />
 
         <View style={styles.settingsSection}>
           <AppText style={styles.uuidText}>
@@ -279,7 +320,7 @@ const SettingsHome = React.createClass({
           </AppText>
         </View>
 
-      </View>
+      </SettingsWrapper>
     );
   }
 });
@@ -292,6 +333,8 @@ const Settings = React.createClass({
     goBack: React.PropTypes.func.isRequired,
     operation: React.PropTypes.string.isRequired,
     setOperation: React.PropTypes.func.isRequired,
+    time: React.PropTypes.number.isRequired,
+    setTime: React.PropTypes.func.isRequired,
     user: React.PropTypes.object.isRequired,
     userList: React.PropTypes.array.isRequired,
     uuid: React.PropTypes.string.isRequired,
@@ -319,6 +362,9 @@ const Settings = React.createClass({
   showModeSelection: function() {
     this.showScreen('modeSelection');
   },
+  showTimeSelection: function() {
+    this.showScreen('timeSelection');
+  },
   showUserSelection: function() {
     this.showScreen('userSelection');
   },
@@ -334,6 +380,8 @@ const Settings = React.createClass({
       goBack,
       operation,
       setOperation,
+      time,
+      setTime,
       user,
       userList,
       uuid,
@@ -356,6 +404,12 @@ const Settings = React.createClass({
         operation={operation}
         setOperation={setOperation} />
     }
+    if (currentScreen === 'timeSelection') {
+      return <TimeSelection
+        goBack={this.showSettingsHome}
+        time={time}
+        setTime={setTime} />
+    }
     if (currentScreen === 'userSelection') {
       return <UserSelection
         changeActiveUser={changeActiveUser}
@@ -372,7 +426,9 @@ const Settings = React.createClass({
         showAddNewUser={this.showAddNewUser}
         showChangeUserName={this.showChangeUserName}
         showModeSelection={this.showModeSelection}
+        showTimeSelection={this.showTimeSelection}
         showUserSelection={this.showUserSelection}
+        time={time}
         user={user}
         uuid={uuid} />
     );
@@ -390,14 +446,16 @@ const styles = StyleSheet.create({
   headingText: {
     color: '#999',
     fontSize: 20,
-    paddingBottom: 10,
+    marginBottom: 20,
+    paddingLeft: 10,
+    paddingRight: 10,
     textAlign: 'center',
   },
   headingTextEmphasis: {
     color: '#555'
   },
 
-  scrollViewContainer: {
+  settingsWrapper: {
     flex: 1,
   },
   settingsSection: {
@@ -407,24 +465,19 @@ const styles = StyleSheet.create({
   input: {
     backgroundColor: '#fff',
     borderColor: '#ddd',
-    height: 40,
+    height: 50,
     paddingRight: 10,
     paddingLeft: 10,
     borderWidth: 1,
     textAlign: 'center'
   },
 
-  userListButton: {
-    flex: 1,
-    marginTop: 0,
-    marginLeft: 2,
-    marginRight: 2,
-    marginBottom: 2,
-    padding: 10,
+  submitButton: {
+    backgroundColor: '#29abca',
+    borderColor: '#2d8ca2',
+    borderBottomWidth: 4,
   },
-  activeUserListButton: {
-    backgroundColor: '#555',
-  },
+
   uuidText: {
     color: '#aaa',
     fontSize: 12,

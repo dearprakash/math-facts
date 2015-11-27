@@ -27,7 +27,6 @@ const Navigation = React.createClass({
       playing: false,
       showStats: false,
       showSettings: false,
-      operation: 'multiplication'
     };
   },
   startGame: function() {
@@ -53,7 +52,7 @@ const Navigation = React.createClass({
     });
   },
   finish: function(quizData, points, playAgain) {
-    const operation = this.state.operation;
+    const operation = this.props.user.operation;
 
     _.each(quizData, (questionData) => {
       MathFactsActions.addAttempts(operation, [questionData]);
@@ -75,7 +74,10 @@ const Navigation = React.createClass({
     MathFactsActions.initializeData();
   },
   setOperation: function(operation) {
-    this.setState({operation: operation});
+    MathFactsActions.setOperation(operation);
+  },
+  setTime: function(time) {
+    MathFactsActions.setTime(time);
   },
   parseQuizzesDataIntoTimeData: function(quizzesData) {
     return _.map(_.range(0, 12), (left) => {
@@ -98,7 +100,7 @@ const Navigation = React.createClass({
       );
     }
 
-    const operation = this.state.operation;
+    const operation = this.props.user.operation;
     const quizzesData = this.props.factData[operation];
     const timeData = this.parseQuizzesDataIntoTimeData(quizzesData);
 
@@ -112,7 +114,7 @@ const Navigation = React.createClass({
           quizzesData={quizzesData}
           timeData={timeData}
           mode={'time'}
-          seconds={60}
+          seconds={this.props.user.time}
           count={10}
         />
       );
@@ -135,8 +137,10 @@ const Navigation = React.createClass({
           changeActiveUser={MathFactsActions.changeActiveUser}
           changeUserName={MathFactsActions.changeName}
           goBack={this.showMenu}
-          operation={this.state.operation}
+          operation={this.props.user.operation}
           setOperation={this.setOperation}
+          time={this.props.user.time}
+          setTime={this.setTime}
           user={this.props.user}
           userList={this.props.userList}
           uuid={this.props.uuid}

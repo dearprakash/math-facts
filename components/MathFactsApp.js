@@ -2,6 +2,7 @@
 
 import React from 'react-native';
 import {
+  Platform,
   StyleSheet,
   View,
 } from 'react-native';
@@ -22,6 +23,13 @@ const MathFactsApp = React.createClass({
       },
     })
   ],
+  componentDidMount: function() {
+    if (Platform.OS === 'ios') {
+      // TODO: add support for CodePush on Android
+      const CodePush = require('react-native-code-push');
+      CodePush.sync();
+    }
+  },
   render: function() {
     return (
       <View style={styles.appWrapper}>

@@ -1,7 +1,7 @@
 'use strict';
 
 import _ from 'underscore';
-
+import moment from 'moment';
 import React from 'react-native';
 import {
   StyleSheet,
@@ -33,18 +33,49 @@ const HomeScreen = React.createClass({
   },
   getPointsToday: function() {
     const scores = this.props.scores.slice();
-    let pointsToday = 0;
-    const d = new Date();
-    const now = d.getTime();
-    const oneDay = 60*60*24*1000;
-    scores.forEach((score) => {
-      if (score && score.date && score.date > now - oneDay && score.score) {
-        pointsToday += score.score;
+    const today = new Date();
+    return scores.reduce((total, score) => {
+      if (score.date && moment(today).isSame(score.date, 'day')) {
+        return total + score.score;
       }
+      return total;
+    }, 0);
+  },
+  getStreak: function() {
+    const scores = this.props.scores.slice().reverse();
+    const streak = {};
+    scores.forEach((score) => {
+      if (!score.date) {
+        return;
+      }
+      const d = new Date(score.date);
+      // Display the date as a string like "Oct 31"
+      const key = moment(d).format("MMM D");
+      if (streak[key] == null) {
+        streak[key] = 0;
+      }
+      streak[key] += score.score;
     });
-    return pointsToday;
+    return streak;
+  },
+  getCurrentStreak: function() {
+    const streak = this.getStreak();
+    const m = moment();
+    let currentStreak = 0;
+    for (let date in streak) {
+      if (date === m.format("MMM D")) {
+        currentStreak++;
+        m.subtract(1, "day")
+      } else {
+        break;
+      }
+    }
+    return currentStreak;
   },
   render: function() {
+    // TODO: Make animations between screens! Possible ways:
+    // - Use Navigator
+    // - Position absolute the other screens on top of the homescreen
     const {
       operation,
       points,
@@ -78,6 +109,14 @@ const HomeScreen = React.createClass({
           (You have {points} points in total)
         </AppText>
 
+        <AppText style={[styles.headingText, {paddingBottom: 0}]}>
+          {'Current streak: '}
+          <AppTextBold style={styles.headingTextEmphasis}>
+            {this.getCurrentStreak()}
+          </AppTextBold>
+          {' day'}
+        </AppText>
+
         <AppText style={styles.headingText}>
           {'You\'re learning '}
           <AppTextBold style={styles.headingTextEmphasis}>
@@ -86,9 +125,7 @@ const HomeScreen = React.createClass({
           {'!'}
         </AppText>
 
-        <View style={styles.eggScene}>
-          <EggScene />
-        </View>
+        <View style={styles.divider} />
 
         <View style={styles.actions}>
           <View style={styles.action}>
@@ -205,6 +242,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'center'
+  },
+
+  divider: {
+    backgroundColor: '#eee',
+    height: 1.5,
+    marginBottom: 25,
+    marginTop: 20,
   },
 
 });
